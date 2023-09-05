@@ -1,0 +1,12 @@
+MTL Law:
+lift . return = return
+
+lift (m >>= f) = lift m >>= lift . f
+
+lift ( do
+    x <- m 
+    f x 
+)
+= do
+    x <- lift m 
+    lift (f x)
