@@ -8,4 +8,15 @@ library
     default-extensions: BlockArguments QuasiQuotes TypeApplications ScopedTypeVariables
     ghc-options: -Wall -fdefer-typed-holes
     build-depends: sockets-and-pipes ^>= 0.3
-    exposed-modules: Book, FileHelpers
+    exposed-modules: Chunks, Book, FileHelpers 
+
+executable proglet
+    main-is: Main.hs
+    -- other-modules:
+    -- other-extensions:
+    -- hs-source-dirs:
+    other-modules: Chunks, FileHelpers
+    default-extensions: BlockArguments QuasiQuotes TypeApplications ScopedTypeVariables
+    ghc-options: -Wall -fdefer-typed-holes
+    build-depends: sockets-and-pipes ^>= 0.3
+    default-language: Haskell2010

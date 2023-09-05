@@ -7,7 +7,7 @@ import qualified System.IO as IO
 import Control.Monad.Trans.Resource (runResourceT, ResourceT)
 import qualified Control.Exception.Safe as Ex
 
-import FileHelpers
+import FileHelpers ( getDataDir, fileResource )
 
 writeGreetingFile :: IO ()
 writeGreetingFile = do
@@ -34,6 +34,7 @@ handlePrintTest = runResourceT @IO do
     liftIO $ IO.print handle
     str <- liftIO $ IO.hShow handle
     liftIO $ putStrLn str
+    liftIO $ IO.hPutStrLn handle "testData"
 
 howManyHandles :: IO ()
 howManyHandles = runResourceT @IO do
@@ -67,3 +68,5 @@ fileResourceMaybe n = do
         Left e -> do
             print (displayException e)
             return Nothing
+
+-- Chapetr 2 begins
