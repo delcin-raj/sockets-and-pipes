@@ -62,20 +62,13 @@ makeFriendAddrInfo addr = runResourceT @IO do
 --                Right c -> print "Connection succeeded"
 --
 -- Exercise 10
-openAndConnect :: S.AddrInfo -> ResourceT IO (ReleaseKey, Maybe Socket)
-openAndConnect addressInfo = allocate setup close
-    where
-        setup = do
-            s <- S.openSocket addressInfo
-            S.setSocketOption s S.UserTimeout 1000
-            result <- try $ S.connect s (S.addrAddress addressInfo) :: IO (Either IOException ())
-            case result of
-                Left _ -> return Nothing
-                Right _ -> return $ Just s
-
-        close x = case x of
-            Just s -> S.close s
-            Nothing -> print "Connection failed"
+openAndConnect :: S.AddrInfo -> ResourceT IO (ReleaseKey, Socket)
+openAndConnect addressInfo = do
+    (rk, s) <- allocate (S.openSocket addressInfo) S.close
+    liftIO $ do
+        S.setSocketOption s S.UserTimeout 1000
+        S.connect s (S.addrAddress addressInfo)
+    return (rk, s)
 
 findGopherWeb :: IO S.AddrInfo
 findGopherWeb = do
