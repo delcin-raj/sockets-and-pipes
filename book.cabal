@@ -8,7 +8,7 @@ library
     default-extensions: BlockArguments QuasiQuotes TypeApplications ScopedTypeVariables
     ghc-options: -Wall -fdefer-typed-holes
     build-depends: sockets-and-pipes ^>= 0.3
-    exposed-modules: Sockets, Bytes, Chunks, Book, FileHelpers 
+    exposed-modules: Http, Sockets, Bytes, Chunks, Book, FileHelpers 
 
 executable proglet
     main-is: Main.hs

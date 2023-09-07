@@ -11,7 +11,6 @@ import qualified Data.Text.Encoding as T
 import Control.Monad.Trans.Resource (runResourceT, allocate, ResourceT, ReleaseKey)
 
 import Chunks (repeatUntilIO)
-import Control.Exception.Safe (try, IOException)
 
 
 makeFriend :: S.SockAddr -> IO ()
