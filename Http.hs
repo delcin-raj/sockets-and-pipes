@@ -5,11 +5,12 @@ import Relude
 import qualified ASCII as A
 import qualified ASCII.Char as A
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
 import qualified Network.Simple.TCP as Net
 import Network.Simple.TCP (HostPreference(HostAny), serve)
 import Sockets (resolve, openAndConnect)
 import Control.Monad.Trans.Resource (runResourceT)
-
+import ASCII.Decimal (Digit (..))
 
 line :: BS.ByteString -> BS.ByteString
 line x = x <> A.lift crlf
@@ -70,3 +71,55 @@ getHaskell = runResourceT @IO do
             line [A.string|Host: haskell.org|] <>
             line [A.string|Connection: close|] <>
             line [A.string||]
+
+data Request = Request RequestLine [HeaderField] (Maybe MessageBody)
+data Response = Response StatusLine [HeaderField] (Maybe MessageBody)
+
+data RequestLine = RequestLine Method RequestTarget HttpVersion
+data Method = Get | Post | Put | Delete | Connect | Options | Trace
+-- data Method = Method BS.ByteString
+
+newtype RequestTarget = RequestTarget BS.ByteString
+
+data StatusLine = StatusLine HttpVersion StatusCode ReasonPhrase
+
+data StatusCode = StatusCode A.Digit A.Digit A.Digit
+
+newtype ReasonPhrase = ReasonPhrase BS.ByteString
+
+newtype MessageBody = MessageBody LBS.ByteString
+
+data HttpVersion = HttpVersion A.Digit A.Digit
+
+data HeaderField = HeaderField FieldName FieldValue
+
+newtype FieldName = FieldName BS.ByteString
+newtype FieldValue = FieldValue BS.ByteString
+
+exRequest :: Request
+exRequest = Request reqLine headers Nothing
+    where
+        reqLine = RequestLine
+            Get
+            (RequestTarget [A.string|/hello.txt|])
+            (HttpVersion Digit1 Digit1)
+        
+        headers = [
+            HeaderField (FieldName [A.string|Host|]) $ FieldValue [A.string|www.example.com|],
+            HeaderField (FieldName [A.string|Accept-Language|]) $ FieldValue [A.string|en, mi|]
+            ]
+
+exResponse :: Response
+exResponse = Response status headers message
+    where
+        status = StatusLine
+            (HttpVersion Digit1 Digit1)
+            (StatusCode Digit2 Digit0 Digit0)
+            (ReasonPhrase [A.string|OK|])
+        
+        headers = [
+            HeaderField (FieldName [A.string|Content-Type|]) (FieldValue [A.string|charset=us-ascii|]),
+            HeaderField (FieldName [A.string|Content-Length|]) (FieldValue [A.string|6|])
+            ]
+
+        message = Just $ MessageBody [A.string|Hello!|]
