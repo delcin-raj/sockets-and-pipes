@@ -6,6 +6,7 @@ import qualified ASCII as A
 import qualified ASCII.Char as A
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.Builder as BSB
 import qualified Network.Simple.TCP as Net
 import Network.Simple.TCP (HostPreference(HostAny), serve)
 import Sockets (resolve, openAndConnect)
@@ -76,7 +77,7 @@ data Request = Request RequestLine [HeaderField] (Maybe MessageBody)
 data Response = Response StatusLine [HeaderField] (Maybe MessageBody)
 
 data RequestLine = RequestLine Method RequestTarget HttpVersion
-data Method = Get | Post | Put | Delete | Connect | Options | Trace
+data Method = Get | Post | Put | Delete | Connect | Options | Trace deriving Show
 -- data Method = Method BS.ByteString
 
 newtype RequestTarget = RequestTarget BS.ByteString
@@ -123,3 +124,81 @@ exResponse = Response status headers message
             ]
 
         message = Just $ MessageBody [A.string|Hello!|]
+
+-- Chapter 7
+encodeLineEnd :: BSB.Builder
+encodeLineEnd = A.lift crlf
+
+encodeRequest :: Request -> BSB.Builder
+encodeRequest (Request reqLine headers bodyMaybe) =
+    encodeRequestLine reqLine <>
+    repeatedlyEncode
+        (\x -> encodeHeaderField x <> encodeLineEnd)
+        headers <>
+    encodeLineEnd <>
+    optionallyEncode encodeMessageBody bodyMaybe
+
+encodeResponse :: Response -> BSB.Builder
+encodeResponse (Response status headers bodyMaybe) =
+    encodeStatusLine status <>
+    repeatedlyEncode
+        (\x -> encodeHeaderField x <> encodeLineEnd)
+        headers <>
+    encodeLineEnd <>
+    optionallyEncode encodeMessageBody bodyMaybe
+
+repeatedlyEncode :: (a -> BSB.Builder) -> [a] -> BSB.Builder
+repeatedlyEncode = foldMap
+
+optionallyEncode :: (a -> BSB.Builder) -> Maybe a -> BSB.Builder
+optionallyEncode = foldMap
+
+encodeMethod :: Method -> BSB.Builder
+encodeMethod method = BSB.string8 (show method)
+
+encodeRequestLine :: RequestLine -> BSB.Builder
+encodeRequestLine (RequestLine method target httpVersion) =
+    encodeMethod method <> A.lift [A.Space] <>
+    encodeRequestTarget target <> A.lift [A.Space] <>
+    encodeHttpVersion httpVersion <> encodeLineEnd
+
+encodeRequestTarget :: RequestTarget -> BSB.Builder
+encodeRequestTarget (RequestTarget t) = BSB.byteString t
+
+encodeHttpVersion :: HttpVersion -> BSB.Builder
+encodeHttpVersion (HttpVersion x y) =
+    [A.string|Http/|] <> A.lift [x]
+    <> [A.string|.|] <> A.lift [y]
+
+encodeStatusCode :: StatusCode -> BSB.Builder
+encodeStatusCode (StatusCode x y z) = A.lift [x, y, z]
+
+encodeStatusLine :: StatusLine -> BSB.Builder
+encodeStatusLine (StatusLine httpVersion statusCode reason) =
+    encodeHttpVersion httpVersion <> A.lift [A.Space] <>
+    encodeStatusCode statusCode <> A.lift [A.Space] <>
+    encodeReasonPhrase reason <> encodeLineEnd
+
+encodeReasonPhrase :: ReasonPhrase -> BSB.Builder
+encodeReasonPhrase (ReasonPhrase reason) = BSB.byteString reason
+
+{-
+data HeaderField = HeaderField FieldName FieldValue
+
+newtype FieldName = FieldName BS.ByteString
+newtype FieldValue = FieldValue BS.ByteString
+line [A.string|Content-Type: text/plain; charset=us-ascii|] <>
+-}
+
+encodeHeaderField :: HeaderField -> BSB.Builder
+encodeHeaderField (HeaderField fieldName fieldValue) =
+    encodeFieldName fieldName <> [A.string|: |] <> encodeFieldValue fieldValue 
+
+encodeFieldName :: FieldName -> BSB.Builder
+encodeFieldName (FieldName x) = BSB.byteString x
+
+encodeFieldValue :: FieldValue -> BSB.Builder
+encodeFieldValue (FieldValue x) = BSB.byteString x
+
+encodeMessageBody :: MessageBody -> BSB.Builder
+encodeMessageBody (MessageBody message) = BSB.lazyByteString message
