@@ -8,6 +8,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Builder as BSB
 import qualified Network.Simple.TCP as Net
+import Network.Socket (Socket)
 import Network.Simple.TCP (HostPreference(HostAny), serve)
 import Sockets (resolve, openAndConnect)
 import Control.Monad.Trans.Resource (runResourceT)
@@ -111,9 +112,9 @@ exRequest = Request reqLine headers Nothing
             ]
 
 exResponse :: Response
-exResponse = Response status headers message
+exResponse = Response statusLine headers message
     where
-        status = StatusLine
+        statusLine = StatusLine
             (HttpVersion Digit1 Digit1)
             (StatusCode Digit2 Digit0 Digit0)
             (ReasonPhrase [A.string|OK|])
@@ -139,8 +140,8 @@ encodeRequest (Request reqLine headers bodyMaybe) =
     optionallyEncode encodeMessageBody bodyMaybe
 
 encodeResponse :: Response -> BSB.Builder
-encodeResponse (Response status headers bodyMaybe) =
-    encodeStatusLine status <>
+encodeResponse (Response statusLine headers bodyMaybe) =
+    encodeStatusLine statusLine <>
     repeatedlyEncode
         (\x -> encodeHeaderField x <> encodeLineEnd)
         headers <>
@@ -202,3 +203,57 @@ encodeFieldValue (FieldValue x) = BSB.byteString x
 
 encodeMessageBody :: MessageBody -> BSB.Builder
 encodeMessageBody (MessageBody message) = BSB.lazyByteString message
+
+-- Chapter 8
+countHelloAscii :: Natural -> LBS.ByteString
+countHelloAscii count = BSB.toLazyByteString $
+    [A.string|Hello!|] <> encodeLineEnd <> case count of
+        0 -> [A.string|This page has never been viewed.|]
+        1 -> [A.string|This page has been viewed once.|]
+        _ -> [A.string|This page has beem viewed|] <> A.showIntegralDecimal count <> [A.string|times.|]
+
+data Status = Status StatusCode ReasonPhrase
+
+ok :: Status
+ok = Status
+    (StatusCode Digit2 Digit0 Digit0)
+    (ReasonPhrase [A.string|ok|])
+
+http_1_1 :: HttpVersion
+http_1_1 = HttpVersion Digit1 Digit1
+
+status :: Status -> StatusLine
+status (Status code phrase) =  StatusLine http_1_1 code phrase
+
+contentType :: FieldName
+contentType = FieldName [A.string|Content-Type|]
+
+plainAscii :: FieldValue
+plainAscii = FieldValue [A.string|text/plain; charset=us=ascii|]
+
+contentLenght :: FieldName
+contentLenght = FieldName [A.string|Content-Length|]
+
+
+asciiOk :: LBS.ByteString -> Response
+asciiOk str = Response (status ok) [typ, len] (Just body)
+    where
+        typ = HeaderField contentType plainAscii
+        len = HeaderField contentLenght (bodyLengthValue body)
+        body = MessageBody str
+
+bodyLengthValue :: MessageBody -> FieldValue
+bodyLengthValue (MessageBody x) = FieldValue (A.showIntegralDecimal $ LBS.length x)
+
+sendResponse :: Socket -> Response -> IO ()
+sendResponse s r = Net.sendLazy s $ BSB.toLazyByteString $ encodeResponse r
+
+stuckCountingServer :: IO a
+stuckCountingServer = serve @IO HostAny "8000" \(s, _) -> do
+    let count = 0
+    sendResponse s (asciiOk (countHelloAscii count))
+
+-- Solution to Exercise 22
+
+mid :: Word8 -> Word8 -> Word8
+mid x y = fromInteger $ (toInteger x * toInteger y) `div` 2
